@@ -242,7 +242,17 @@ bus.on('joined', (e) => {
   if (phase !== 'joining') return;
   showGame(code);
 });
-bus.on('full', () => { if (phase === 'joining') joinFailed(); });
+bus.on('full', () => {
+  if (phase === 'joining') joinFailed();
+  else if (phase === 'game') {
+    // Evicted after joining (lost a slot fight in a full room): net.js has already
+    // torn the session down, so go back to the lobby instead of a dead game screen.
+    safe(draw.blank);
+    setHash('');
+    showLobby();
+    nope();
+  }
+});
 bus.on('net', (e) => { netbad.hidden = !(e && e.ok === false); });
 
 playBtn.addEventListener('click', play);

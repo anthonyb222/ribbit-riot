@@ -12,7 +12,7 @@ const OPS = new Set(['s', 'wall', 'puff', 'eyes', 'worm', 'clear']);
 const PEN_W = 10, ERASE_W = 46;
 const PEN_K = 75, PEN_C = 8.5, COAST_C = 6.5, PEN_VMAX = 2600, WALL = 5;
 const LOOP = 8 * BEAT_MS, STEPS = 32, BANDS = 12;
-const MAX_EYES = 60, EYE_MIN = 14, EYE_MAX = 70;
+const MAX_EYES = 60, EYE_MIN = 34, EYE_MAX = 90;
 const WORM_C = '#8fe36b', PINK = '#ff9bb0';
 const hexRgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 const PAL_RGB = PALETTE.map(hexRgb);
@@ -32,18 +32,21 @@ const parts = [];                // fx particles
 const focus = { x: ART_W / 2, y: ART_H / 2, tx: ART_W / 2, ty: ART_H / 2 };
 let held = [];                   // ops that arrived during the encore / sync image load
 let syncLoading = false, syncGen = 0;
+// Every op (mine and theirs) since a sync was asked for. The synced picture replaces
+// the page when it lands, so these are painted back on top of it.
+let recent = null, recentAt = 0, recentMark = 0;
 let crumple = null, crumpleCv = null;
 let lastBonk = 0, lastPop = 0, lastStale = 0;
 
 // local input
-const ges = { pid: null, tool: -1, x: 0, y: 0, t0: 0 };
+const ges = { pid: null, tool: -1, x: 0, y: 0, t0: 0, touch: false };
 const pen = {
   active: false, down: false, id: '', c: 0, x: 0, y: 0, vx: 0, vy: 0, tx: 0, ty: 0,
   coast: 0, pend: [], lastFlush: 0, rx: 0, ry: 0, sq: { x: 0, v: 0 }, lastWall: 0, lastSkid: 0, lastDust: 0,
 };
 const era = { id: '', c: 0, pend: [], lastFlush: 0, rx: 0, ry: 0, lastSfx: 0 };
 let hover = null, lastSqueak = 0, strokeN = 0;
-const clr = { held: false, t: 0 };
+const clr = { held: false, t: 0, hint: 0 };
 const worm = { x: -40, scr: 0, cheek: { x: 0, v: 0 }, gag: 0, lastStep: -1, gagLoop: -1 };
 const btn = { tools: [], colors: [], worm: null, clear: null };
 
@@ -67,6 +70,7 @@ export function applyOp(m, opts) {
 }
 
 export function snapshot() {
+  flushHeld();
   finishPuffs();
   const c = document.createElement('canvas');
   c.width = ART_W; c.height = ART_H;
@@ -131,15 +135,29 @@ export function init() {
 
   bus.on('msg', (m) => {
     if (!isOp(m)) return;
-    if (state.replaying || syncLoading) { if (held.length < 4000) held.push(m); return; }
+    let kept = false;
+    if (recent) {
+      if (!syncLoading && performance.now() - recentAt > 45000) recent = null;     // no answer ever came
+      else if (recent.length < 3000) { recent.push(m); kept = true; }
+    }
+    if (state.replaying || syncLoading) {
+      // ops parked for a sync image come back from `recent` when it lands, not from `held`
+      if (!(syncLoading && kept) && held.length < 4000) held.push(m);
+      return;
+    }
+    flushHeld();                   // parked ops first, so nothing is ever painted out of order
     applyOp(m);
   });
+  bus.on('syncing', () => { recent = []; recentAt = performance.now(); });
+  bus.on('synced', () => { if (!syncLoading) recent = null; });
   bus.on('tick', onTick);
   bus.on('layout', () => { shown = fx.getClientRects().length > 0; });
+  bus.on('joined', () => { recent = null; });
   bus.on('joined', (d) => { if (!colorPicked && d && isNum(d.slot)) setColor(clamp(Math.round(d.slot), 0, 3), false); });
   bus.on('players', () => { const p = myPlayer(); if (!colorPicked && p && isNum(p.slot)) setColor(clamp(Math.round(p.slot), 0, 3), false); });
 
   sync.provide('art', () => {
+    flushHeld();
     finishPuffs();
     return { img: encodeArt(), eyes: eyes.map(plainEye), worm: wormOn ? 1 : 0 };
   });
@@ -151,15 +169,28 @@ export function init() {
     if (!/^data:image\/(webp|png|jpeg);base64,/.test(v.img)) return;
     const gen = ++syncGen, im = new Image();
     syncLoading = true;
+    recentMark = recent ? recent.length : 0;
     im.onload = () => {
       if (gen !== syncGen) return;
       syncLoading = false;
       strokes.clear(); puffs = [];
       actx.fillStyle = PAPER; actx.fillRect(0, 0, ART_W, ART_H);
       try { actx.drawImage(im, 0, 0, ART_W, ART_H); } catch (e) { console.error(e); }
+      // Put back everything drawn since the sync was asked for. Ops the picture already
+      // holds repaint the same pixels in the same order, so doing them again is harmless.
+      const again = recent || [];
+      recent = null;
+      for (const m of again) applyOp(m, { quiet: true });
       bus.emit('artsync');
     };
-    im.onerror = () => { if (gen === syncGen) syncLoading = false; };
+    im.onerror = () => {
+      if (gen !== syncGen) return;
+      syncLoading = false;
+      // The page was not replaced: only the ops parked while loading still need painting.
+      const again = recent ? recent.slice(recentMark) : [];
+      recent = null;
+      for (const m of again) applyOp(m, { quiet: true });
+    };
     im.src = v.img;
   });
 }
@@ -194,6 +225,12 @@ function abortGesture() {
   ges.pid = null; ges.tool = -1;
   pen.active = false; pen.down = false; pen.pend = [];
   era.pend = [];
+}
+function flushHeld() {            // paint the ops parked during an encore / sync load, in order
+  if (!held.length || state.replaying || syncLoading) return;
+  const q = held;
+  held = [];
+  for (const m of q) applyOp(m, { quiet: true });
 }
 function setFocus(x, y) { focus.tx = x; focus.ty = y; }
 function addPart(k, x, y, vx, vy, life, r, c, grav) {
@@ -259,6 +296,17 @@ function opStroke(m, quiet) {
   }
   st.t = performance.now(); st.c = c; st.w = w; st.erase = erase;
   const n = Math.min(m.pts.length, 400) & ~1;
+  if (livePuffs()) {                 // a cloud still blooming must not end up on top of this ink
+    const pad = w / 2 + 3;
+    let lx = st.x, ly = st.y, has = st.n > 0;
+    for (let i = 0; i < n; i += 2) {
+      const px = m.pts[i], py = m.pts[i + 1];
+      if (!isNum(px) || !isNum(py)) break;
+      const x = clamp(Math.round(px), 0, ART_W), y = clamp(Math.round(py), 0, ART_H);
+      settlePuffs(has ? lx : x, has ? ly : y, x, y, pad);
+      lx = x; ly = y; has = true;
+    }
+  }
   actx.lineCap = 'round'; actx.lineJoin = 'round'; actx.lineWidth = w;
   actx.strokeStyle = actx.fillStyle = erase ? PAPER : PALETTE[c];
   let open = false;
@@ -289,6 +337,7 @@ function opStroke(m, quiet) {
 }
 function endStroke(key, st) {       // finish a stale stroke's last half-segment and forget it
   if (st && st.n > 1) {
+    settlePuffs(st.mx, st.my, st.x, st.y, st.w / 2 + 3);
     actx.lineCap = 'round'; actx.lineJoin = 'round'; actx.lineWidth = st.w;
     actx.strokeStyle = st.erase ? PAPER : PALETTE[st.c];
     actx.beginPath(); actx.moveTo(st.mx, st.my); actx.lineTo(st.x, st.y); actx.stroke();
@@ -312,6 +361,7 @@ function opWall(m, quiet) {
   const x = clamp(Math.round(m.x), 0, ART_W), y = clamp(Math.round(m.y), 0, ART_H);
   const rnd = rng((Math.imul(x + 1, 73856093) ^ Math.imul(y + 1, 19349663)) >>> 0);
   const spikes = 5 + Math.floor(rnd() * 3), R = 20 + rnd() * 12, a0 = rnd() * TAU;
+  settlePuffs(x, y, x, y, 72);             // the dent and its specks reach about 70px
   actx.fillStyle = OUTLINE;
   actx.beginPath();
   for (let i = 0; i < spikes * 2; i++) {
@@ -350,7 +400,8 @@ function opPuff(m, quiet, speed) {
     cs[i * 3 + 1] = Math.round(y + Math.sin(a) * d * 0.92);
     cs[i * 3 + 2] = Math.round(r);
   }
-  const pf = { cs, n, c, t: 0, dur: 0.6, speed, done: false, sp: null };
+  const pf = { cs, n, c, t: 0, dur: 0.6, speed, done: false, sp: null, x, y, R: R * 1.05 };
+  settlePuffs(x, y, x, y, pf.R);           // older clouds under this one finish first
   setFocus(x, y);
   jiggleNear(x, y, R + 160);
   if (document.hidden) { paintPuff(pf, 1); return; }
@@ -385,6 +436,19 @@ function paintPuff(pf, u) {
 }
 function finishPuffs() {
   for (const pf of puffs) if (!pf.done) paintPuff(pf, 1);
+}
+function livePuffs() {
+  for (let i = 0; i < puffs.length; i++) if (!puffs[i].done) return true;
+  return false;
+}
+// Finish every unfinished cloud that the segment (x0,y0)-(x1,y1), fattened by pad,
+// touches. Whatever is painted next then lands on top of the finished cloud on every
+// client, however far its bloom animation had got. Changes actx.fillStyle and the path.
+function settlePuffs(x0, y0, x1, y1, pad) {
+  for (let i = 0; i < puffs.length; i++) {
+    const pf = puffs[i];
+    if (!pf.done && distSeg(pf.x, pf.y, x0, y0, x1, y1) < pf.R + pad) paintPuff(pf, 1);
+  }
 }
 
 function opEyes(m, quiet) {
@@ -444,6 +508,7 @@ function onDown(e) {
   try { fx.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
   toArt(e);
   ges.pid = e.pointerId; ges.tool = tool; ges.t0 = performance.now();
+  ges.touch = e.pointerType !== 'mouse';
   hover = null;
   if (tool === 0) {
     if (pen.active) finishPen();
@@ -606,12 +671,14 @@ function buildTools() {
   cb.style.touchAction = 'none';
   cb.addEventListener('pointerdown', (e) => {
     if (state.replaying) return;
-    clr.held = true; clr.t = 0;
+    clr.held = true; clr.t = 0; clr.hint = 0;
+    paintIcon(btn.clear);          // the ring shows at once, so even a quick tap says "hold me"
     try { cb.setPointerCapture(e.pointerId); } catch (err) { /* synthetic */ }
   });
   const stop = () => {
     if (!clr.held) return;
-    clr.held = false; clr.t = 0; paintIcon(btn.clear);
+    clr.held = false; clr.hint = 0.4;      // let go too early: the ring drains away (see onTick)
+    paintIcon(btn.clear);
     sfx('nope');
   };
   cb.addEventListener('pointerup', stop);
@@ -721,8 +788,10 @@ function icClear(g) {
     if (i) g.lineTo(x, y); else g.moveTo(x, y);
   }
   g.closePath(); g.fill(); g.stroke();
-  if (clr.held && clr.t > 0) {
-    g.beginPath(); g.arc(20, 20, 17.5, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(clr.t / 0.7, 0, 1));
+  if (clr.held || clr.hint > 0) {            // hold ring: starts a quarter full so a tap shows it
+    const k = Math.max(0.25, clamp(clr.t / 0.7, 0, 1)) * (clr.held ? 1 : clamp(clr.hint / 0.4, 0, 1));
+    g.beginPath(); g.arc(20, 20, 17.5, -Math.PI / 2, -Math.PI / 2 + TAU * k);
+    g.strokeStyle = OUTLINE; g.lineWidth = 7; g.stroke();
     g.strokeStyle = '#ff5a5f'; g.lineWidth = 4; g.stroke();
   }
 }
@@ -757,7 +826,7 @@ function wormStep(step, loopIdx) {
     bandTim[b] = best; inkList[n++] = b;
   }
   if (!n) return;
-  if (n >= 8 && worm.gagLoop !== loopIdx) {           // too much ink: bleurgh
+  if (n >= 8 && loopIdx - worm.gagLoop >= 4) {         // too much ink: bleurgh (but not every lap)
     worm.gagLoop = loopIdx; worm.gag = 1;
     sfx('gag');
     const rnd = rng((loopIdx * 33 + step + 7) >>> 0);
@@ -773,7 +842,7 @@ function wormStep(step, loopIdx) {
     picks[0] = inkList[off]; picks[1] = inkList[n >> 1]; picks[2] = inkList[n - 1 - off];
     k = 3;
   }
-  const vol = k === 1 ? 0.9 : k === 2 ? 0.75 : 0.62;
+  const vol = k === 1 ? 0.4 : k === 2 ? 0.33 : 0.27;   // a backing track under the instruments
   for (let i = 0; i < k; i++) {
     const b = picks[i], tim = bandTim[b];
     pluck(13 - b, tim, vol);                           // band 0 (top) -> SCALE[13], band 11 -> SCALE[2]
@@ -1018,11 +1087,19 @@ function drawLocal(g, t, now) {
     const secs = (now - ges.t0) / 1000;
     if (ges.tool === 1) {
       const p = clamp(secs / 1.5, 0, 1), sh = Math.sin(t * 0.09) * 5 * p, wb = Math.sin(t * 0.05) * 0.07 * p;
-      drawCushion(g, clamp(ges.x, 0, ART_W) + sh, clamp(ges.y, 0, ART_H), 26 + 70 * p, 1 + wb, 1 - wb, Math.sin(t * 0.021) * 0.1 * p, PALETTE[color], p);
+      // under a finger the cushion would be hidden: float it above on a thread
+      const size = 26 + 70 * p, fx0 = clamp(ges.x, 0, ART_W), fy = clamp(ges.y, 0, ART_H);
+      const yy = ges.touch ? Math.max(size + 8, fy - 150 - size) : fy;
+      if (ges.touch) {
+        g.strokeStyle = OUTLINE; g.lineWidth = 5; g.lineCap = 'round';
+        g.beginPath(); g.moveTo(fx0, fy); g.quadraticCurveTo(fx0 + sh * 2, (fy + yy) / 2, fx0 + sh, yy); g.stroke();
+      }
+      drawCushion(g, fx0 + sh, yy, size, 1 + wb, 1 - wb, Math.sin(t * 0.021) * 0.1 * p, PALETTE[color], p);
       if (now - lastSqueak > (p >= 1 ? 240 : 110)) { lastSqueak = now; sfx('squeak', { p }); }
-      if (p > 0.7 && Math.random() < 0.25) addPart(0, ges.x + (Math.random() - 0.5) * 120 * p, ges.y - 60 * p, (Math.random() - 0.5) * 200, -200, 0.35, 5, '#3fa7ff', 900);
+      if (p > 0.7 && Math.random() < 0.25) addPart(0, fx0 + (Math.random() - 0.5) * 120 * p, yy - 60 * p, (Math.random() - 0.5) * 200, -200, 0.35, 5, '#3fa7ff', 900);
     } else if (ges.tool === 2) {
-      const r = eyeR(secs), x = clamp(ges.x, 0, ART_W), y = clamp(ges.y, 0, ART_H) - 10 - Math.abs(Math.sin(t * 0.012)) * 8;
+      const r = eyeR(secs), x = clamp(ges.x, 0, ART_W);
+      const y = Math.max(r, clamp(ges.y, 0, ART_H) - (ges.touch ? 150 + r : 10)) - Math.abs(Math.sin(t * 0.012)) * 8;
       g.globalAlpha = 0.8;
       googlyEye(g, x - r * 0.92, y, r, 0, 0.9, clamp(r * 0.16, 3, 7));
       googlyEye(g, x + r * 0.92, y, r, 0, 0.9, clamp(r * 0.16, 3, 7));
@@ -1033,7 +1110,7 @@ function drawLocal(g, t, now) {
     else if (tool === 1) drawCushion(g, hover.x, hover.y, 20, 1, 1, 0, PALETTE[color], 0);
     else if (tool === 2) {
       g.globalAlpha = 0.6;
-      googlyEye(g, hover.x - 13, hover.y, EYE_MIN, 0, 0.8, 3); googlyEye(g, hover.x + 13, hover.y, EYE_MIN, 0, 0.8, 3);
+      googlyEye(g, hover.x - EYE_MIN * 0.92, hover.y, EYE_MIN, 0, 0.8, 5); googlyEye(g, hover.x + EYE_MIN * 0.92, hover.y, EYE_MIN, 0, 0.8, 5);
       g.globalAlpha = 1;
     } else drawEraser(g, hover.x, hover.y, 0);
   }
@@ -1067,13 +1144,15 @@ function onTick(d) {
   const t = d && isNum(d.t) ? d.t : performance.now();
   const now = performance.now();
 
-  if (held.length && !state.replaying && !syncLoading) {
-    const q = held; held = [];
-    for (const m of q) applyOp(m, { quiet: true });
+  flushHeld();
+  if (clr.hint > 0) {
+    clr.hint -= dt;
+    if (clr.hint <= 0) { clr.hint = 0; if (!clr.held) clr.t = 0; }
+    if (btn.clear) paintIcon(btn.clear);
   }
   if (state.replaying) {
     if (ges.pid !== null || pen.active) abortGesture();
-    clr.held = false;
+    if (clr.held) { clr.held = false; clr.t = 0; if (btn.clear) paintIcon(btn.clear); }
   } else {
     if (pen.active) penTick(dt, now);
     if (ges.pid !== null && ges.tool === 3 && era.pend.length && now - era.lastFlush >= 50) flushStroke(era, 'erase', ERASE_W, 0);

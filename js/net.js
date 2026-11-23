@@ -122,6 +122,9 @@ function brokerUp() {
   if (phase === 'probing') { rawPublish({ t: '_who' }); return; }
   if (phase !== 'joined') return;
   if (downSince && Date.now() - downSince > 4000) { stale = true; staleTicks = 0; }
+  // Gone long enough to have been dropped: come back as the newcomer, so whoever
+  // took my seat meanwhile keeps it and I am the one who moves.
+  if (downSince && Date.now() - downSince > DEAD_MS) joinedAt = Date.now();
   downSince = 0;
   graceAll(Date.now());
   heartbeat();
@@ -290,6 +293,10 @@ function releaseHeld() {
 function heartbeat() {
   const me = state.players.get(myId);
   if (phase !== 'joined' || !me) return;
+  // Timers were frozen (see tick): never announce my old seniority after a sleep,
+  // even if this timer happens to wake up before the tick does.
+  const now = Date.now();
+  if (now - lastTick > 5000) joinedAt = now;
   rawPublish({ t: '_hb', slot: me.slot, inst: me.inst, pied: !!me.pied, j: joinedAt });
 }
 
@@ -436,6 +443,7 @@ function tick() {
   if (gap > 5000) {                 // timers were frozen (phone slept, tab buried)
     stale = true; staleTicks = 0;
     graceAll(now);
+    joinedAt = now;                 // the others have dropped me: I return as the newcomer
     heartbeat();
     who(true);
   }
@@ -460,6 +468,7 @@ function requestSync(target) {
   if (syncWait || phase !== 'joined') return;
   syncWait = { target, tries: 0, src: null, n: 0, parts: null, got: 0, size: 0, timer: 0, lenient: false };
   holding = true;
+  bus.emit('syncing');             // draw.js starts remembering ops to put back on top of the synced picture
   askNeed();
 }
 
@@ -585,9 +594,14 @@ function answerSync(to, attempt) {
   let i = 0;
   sending.add(to);
   const step = () => {
-    if (tok !== session || phase !== 'joined' || !state.players.has(to)) { sending.delete(to); return; }
-    rawPublish({ t: '_sync', to, n, i, d: json.slice(i * CHUNK, (i + 1) * CHUNK) });
-    if (++i < n) setTimeout(step, SYNC_GAP_MS); else sending.delete(to);
+    // A hidden tab's timers only fire about once a second, so send a burst per wake-up there.
+    let burst = typeof document !== 'undefined' && document.hidden ? 12 : 1;
+    while (burst-- > 0) {
+      if (tok !== session || phase !== 'joined' || !state.players.has(to)) { sending.delete(to); return; }
+      rawPublish({ t: '_sync', to, n, i, d: json.slice(i * CHUNK, (i + 1) * CHUNK) });
+      if (++i >= n) { sending.delete(to); return; }
+    }
+    setTimeout(step, SYNC_GAP_MS);
   };
   step();
 }

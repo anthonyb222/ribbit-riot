@@ -52,7 +52,7 @@ const wh = { drag: false, pid: null, h: 0, sentH: -1, sentAt: 0 };
 let pokeFrac = null;                  // exact local poke position for the belly dent
 
 const GOOSE_KEYS = { KeyQ: 0, KeyW: 1, KeyE: 2, KeyR: 3, KeyT: 4 };
-const BONK_KEYS = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, KeyA: 0, KeyS: 1, KeyD: 2, KeyF: 3 };
+const BONK_KEYS = { KeyA: 0, KeyS: 1, KeyD: 2, KeyF: 3 };   // not the number row: 1-4 pick drawing tools
 const BELLY_KEYS = { KeyZ: 0, KeyX: 1, KeyC: 2, KeyV: 3, KeyB: 4 };
 const keyOf = (map, code) => (Object.prototype.hasOwnProperty.call(map, code) ? map[code] : -1);
 
@@ -267,7 +267,9 @@ function whistleHAt(x, y) {
 const r3 = (v) => Math.round(v * 1000) / 1000;
 function sendWhistle(force) {
   const t = now();
-  if (!force && (t - wh.sentAt < 66 || Math.abs(wh.h - wh.sentH) < 0.002)) return;
+  // An unchanged height is still re-sent every half second: listeners drop a whistle
+  // that has been silent for 1.5s (their guard against a lost drop message).
+  if (!force && (t - wh.sentAt < 66 || (Math.abs(wh.h - wh.sentH) < 0.002 && t - wh.sentAt < 500))) return;
   wh.sentAt = t; wh.sentH = wh.h;
   send({ t: 'n', i: 'whistle', h: r3(wh.h), on: 1 });
 }

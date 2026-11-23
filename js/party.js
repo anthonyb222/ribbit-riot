@@ -482,6 +482,9 @@ function onFrogTap(e) {
   if (!best) return;
   e.preventDefault();
   if (armed) {
+    // already wearing one: no piling on (the pie stays armed, pick another frog)
+    const pl = state.players.get(best.id);
+    if (best.pied || (pl && pl.pied) || best.incoming > 0) { nope(pieBtn); return; }
     setArmed(false);
     pieBtn.cool = pieBtn.max = 10;
     send({ t: 'pie', to: best.id });
@@ -543,15 +546,6 @@ function icoDownload(g) {
   g.fillStyle = '#3fa7ff'; g.fill(); g.stroke();
   g.lineWidth = 5; g.beginPath(); g.moveTo(8, 32); g.lineTo(8, 41); g.lineTo(40, 41); g.lineTo(40, 32); g.stroke();
 }
-const CRUMPLE = [24, 6, 33, 9, 41, 17, 38, 27, 42, 34, 31, 42, 21, 39, 12, 42, 6, 31, 10, 22, 7, 13, 16, 11];
-function icoCrumple(g) {
-  g.lineWidth = 3.5; g.beginPath();
-  for (let i = 0; i < CRUMPLE.length; i += 2) { if (i) g.lineTo(CRUMPLE[i], CRUMPLE[i + 1]); else g.moveTo(CRUMPLE[i], CRUMPLE[i + 1]); }
-  g.closePath(); g.fillStyle = '#fff'; g.fill(); g.stroke();
-  g.lineWidth = 2; g.beginPath();
-  g.moveTo(16, 11); g.lineTo(22, 22); g.lineTo(33, 9); g.moveTo(22, 22); g.lineTo(21, 39);
-  g.moveTo(22, 22); g.lineTo(38, 27); g.moveTo(10, 22); g.lineTo(22, 22); g.stroke();
-}
 function icoCheck(g) {
   for (let p = 0; p < 2; p++) {
     g.strokeStyle = p ? '#5ad66f' : OUTLINE; g.lineWidth = p ? 6.5 : 13;
@@ -581,10 +575,13 @@ function startHold() {
   if (hold) return;
   if (state.replaying || frBtn.cool > 0) { nope(frBtn); return; }
   hold = { t: 0, sq: 0 };
+  frBtn.ring = Math.max(frBtn.ring, 0.25); frBtn.dirty = true;   // the ring shows at once: even a tap says "hold me"
 }
-function stopHold() {
+function stopHold(silent) {
   if (!hold) return;
-  hold = null; frBtn.ring = 0; frBtn.wig.v = 8; frBtn.dirty = true;
+  hold = null; frBtn.wig.v = 8; frBtn.dirty = true;
+  if (silent === true) frBtn.ring = 0;
+  else snd('nope');              // let go too early: the ring drains away in tickButtons
 }
 function buildChaos() {
   const box = document.getElementById('chaos'); if (!box) return;
@@ -616,10 +613,12 @@ function buildChaos() {
 }
 function tickButtons(dt) {
   if (hold && frBtn) {
-    hold.t += dt; frBtn.ring = Math.min(1, hold.t / 0.8); frBtn.dirty = true;
+    hold.t += dt; frBtn.ring = Math.max(0.25, Math.min(1, hold.t / 0.8)); frBtn.dirty = true;
     if (T - hold.sq > 0.09) { hold.sq = T; snd('squeak', { p: frBtn.ring }); }
-    if (state.replaying) stopHold();
+    if (state.replaying) stopHold(true);
     else if (hold.t >= 0.8) { hold = null; frBtn.ring = 0; send({ t: 'frame' }); }
+  } else if (frBtn && frBtn.ring > 0) {
+    frBtn.ring = Math.max(0, frBtn.ring - dt * Math.max(0.6, frBtn.ring * 1.5)); frBtn.dirty = true;   // a tap's ring lingers ~0.4s
   }
   tickBtn(pieBtn, dt); tickBtn(twBtn, dt); tickBtn(frBtn, dt);
 }
@@ -710,7 +709,7 @@ function drawCurtains(g, W, H, x) {
       g.beginPath(); g.moveTo(fxp, 0); g.quadraticCurveTo(fxp - side * Math.sin(T * 2 + k) * 6, H * 0.5, fxp, H); g.stroke();
     }
   }
-  const vh = Math.min(H * 0.085, 64) * Math.min(1, x * 4), n = Math.max(4, Math.round(W / 110)), sw = W / n;
+  const vh = Math.min(H * 0.085, 64) * Math.min(1, x * 10), n = Math.max(4, Math.round(W / 110)), sw = W / n;
   g.beginPath(); g.moveTo(-10, -10); g.lineTo(W + 10, -10); g.lineTo(W + 10, vh * 0.5);
   for (let i = n; i > 0; i--) g.quadraticCurveTo((i - 0.5) * sw, vh * 1.7, (i - 1) * sw - (i === 1 ? 10 : 0), vh * 0.5);
   g.closePath(); g.fillStyle = '#c92a41'; g.fill(); g.lineWidth = 6; g.strokeStyle = OUTLINE; g.stroke();
@@ -825,16 +824,16 @@ function startCream() {
   if (!game) return;
   if (cream) {   // pied again: fresh coat
     paintCream(cream); cream.grid.fill(0); cream.hit = 0;
-    clearTimeout(cream.timer); cream.timer = setTimeout(() => endCream(true), 15000);
+    clearTimeout(cream.timer); cream.timer = setTimeout(() => endCream(true), 8000);
     return;
   }
   const c = document.createElement('canvas');
   c.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;z-index:75;touch-action:none;cursor:grab';
   const W = Math.max(1, window.innerWidth), H = Math.max(1, window.innerHeight), d = Math.min(window.devicePixelRatio || 1, 1.5);
   c.width = Math.round(W * d); c.height = Math.round(H * d);
-  const o = { c, g: c.getContext('2d'), W, H, d, grid: new Uint8Array(GW * GH), hit: 0, pts: new Map(), wipeAt: 0, born: nowMs(), timer: 0, R: Math.max(40, Math.min(W, H) * 0.1) };
+  const o = { c, g: c.getContext('2d'), W, H, d, grid: new Uint8Array(GW * GH), hit: 0, pts: new Map(), wipeAt: 0, born: nowMs(), timer: 0, R: Math.max(64, Math.min(W, H) * 0.18) };
   paintCream(o);
-  o.timer = setTimeout(() => endCream(true), 15000);
+  o.timer = setTimeout(() => endCream(true), 8000);
   const at = (e) => { const r = c.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / (r.width || 1), y: (e.clientY - r.top) * H / (r.height || 1) }; };
   c.addEventListener('pointerdown', (e) => {
     e.preventDefault();
@@ -870,7 +869,7 @@ function scrub(o, x0, y0, x1, y1) {
   }
   const n = nowMs();
   if (n - o.wipeAt > 110) { o.wipeAt = n; snd('wipe'); }
-  if (o.hit >= GW * GH * 0.68) endCream(true);
+  if (o.hit >= GW * GH * 0.5) endCream(true);
 }
 function endCream(clean) {
   const o = cream; if (!o) return;
@@ -922,7 +921,8 @@ function record(m) {
 function startEncore() {
   if (state.replaying || enc) return;
   closeFramed();
-  setArmed(false); stopHold();
+  setArmed(false); stopHold(true);
+  if (frBtn) { frBtn.ring = 0; frBtn.dirty = true; }
   state.replaying = true;
   const final = safe(snapshot, null);
   const src = final ? log.slice() : [], n = src.length, Ts = new Float64Array(n);
@@ -980,7 +980,7 @@ function takeBow() {
   const fall = fs.length ? Math.floor(rng(e.seed)() * fs.length) : -1;
   fs.forEach((f, i) => { f.bow = { t: -0.1 * i, fall: i === fall, hit: false, dir: f.x < CW / 2 ? 1 : -1 }; });
   spawnConfetti();
-  if (cur.x > 0.01 || curTarget > 0) curTarget = 0.24;
+  if (cur.x > 0.01 || curTarget > 0) curTarget = 0.1;
 }
 function tickEncore(dt) {
   const e = enc; if (!e) return;
@@ -988,7 +988,7 @@ function tickEncore(dt) {
   if (e.phase === 'close') {
     if (e.t > 0.7) {
       safe(() => (baseline ? restore(baseline) : blank()));
-      curTarget = 0.24; e.phase = 'play'; e.t = 0;
+      curTarget = 0.1; e.phase = 'play'; e.t = 0;
     }
   } else if (e.phase === 'play') {
     e.clock += dt * 1000 * e.speed; e.nb = 0;
@@ -1006,10 +1006,19 @@ function endEncore() {
   const e = enc; enc = null;
   if (!e) { state.replaying = false; return; }
   settle(e);
+  // Freeze the finished piece now, while the canvas is exactly the framed state: the
+  // keepsake must not change (or go blank) because of what anyone does afterwards.
+  let shot = null;
+  try {
+    shot = document.createElement('canvas'); shot.width = ART_W; shot.height = ART_H;
+    const sg = shot.getContext('2d');
+    sg.fillStyle = PAPER; sg.fillRect(0, 0, ART_W, ART_H);
+    drawFlat(sg, 0, 0);            // pixels + googly eyes
+  } catch (err) { console.error('[party]', err); shot = null; }
   state.replaying = false;
   setFxInput(false); curTarget = 0;
   if (frBtn) { frBtn.cool = frBtn.max = 30; }
-  showFramed();
+  showFramed(shot);
 }
 
 // ---------- the framed picture ----------
@@ -1020,7 +1029,7 @@ function scEdge(g, ax, ay, bx, by, nx, ny) {
     g.quadraticCurveTo(lerp(ax, bx, m) + nx * 17, lerp(ay, by, m) + ny * 17, lerp(ax, bx, u), lerp(ay, by, u));
   }
 }
-function composeFrame(c) {
+function composeFrame(c, shot) {
   const g = c.getContext('2d'), W = FW, H = FH, B = FB, m = 24;
   g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H); g.lineJoin = g.lineCap = 'round';
   g.beginPath(); g.moveTo(m, m);
@@ -1033,7 +1042,7 @@ function composeFrame(c) {
   g.moveTo(B * 0.3, B * 1.5); g.lineTo(B * 0.3, B * 2.6); g.stroke();
   // the art
   g.fillStyle = PAPER; g.fillRect(B, B, ART_W, ART_H);
-  safe(() => drawFlat(g, B, B));   // pixels + googly eyes
+  if (shot) g.drawImage(shot, B, B, ART_W, ART_H);   // the picture as it was when the encore ended
   g.lineWidth = 10; g.strokeStyle = OUTLINE; g.strokeRect(B, B, ART_W, ART_H);
   // corner bosses with swirls
   const cs = [[B * 0.5, B * 0.5], [W - B * 0.5, B * 0.5], [W - B * 0.5, H - B * 0.5], [B * 0.5, H - B * 0.5]];
@@ -1059,20 +1068,21 @@ function sizeFramed() {
   const w = Math.max(120, Math.min(window.innerWidth * 0.94, (window.innerHeight - 120) * FW / FH));
   framed.pic.style.width = w + 'px'; framed.pic.style.height = (w * FH / FW) + 'px';
 }
-function showFramed() {
+function showFramed(shot) {
   closeFramed();
-  if (!game) return;
+  if (!game || !shot) return;
   const wrap = document.createElement('div');
   wrap.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;z-index:80;background:rgba(43,33,64,0.8);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;touch-action:none;overflow:hidden';
   const pic = document.createElement('canvas'); pic.width = FW; pic.height = FH;
   pic.style.cssText = 'display:block;flex:none;transform:rotate(-2.5deg)';
-  composeFrame(pic);
+  composeFrame(pic, shot);
   const row = document.createElement('div');
   row.style.cssText = 'display:flex;gap:18px;align-items:center;justify-content:center;flex:none';
-  const dl = mkBtn('save', icoDownload), fresh = mkBtn('new page', icoCrumple), ok = mkBtn('close', icoCheck);
-  for (const o of [dl, fresh, ok]) { paintBtn(o); row.appendChild(o.b); }
+  // (no "new page" here: one stray tap would wipe everybody's page; the toolbar's hold-to-clear covers it)
+  const dl = mkBtn('save', icoDownload), ok = mkBtn('close', icoCheck);
+  for (const o of [dl, ok]) { paintBtn(o); row.appendChild(o.b); }
   dl.b.addEventListener('click', () => {
-    composeFrame(pic); snd('pop');
+    snd('pop');                    // saves the frozen frame as shown, never the live canvas
     safe(() => pic.toBlob((blob) => {
       if (!blob) return;
       const url = URL.createObjectURL(blob), a = document.createElement('a');
@@ -1081,13 +1091,11 @@ function showFramed() {
       setTimeout(() => URL.revokeObjectURL(url), 4000);
     }, 'image/png'));
   });
-  fresh.b.addEventListener('click', () => { closeFramed(); send({ t: 'clear' }); });
   ok.b.addEventListener('click', () => { snd('pop'); closeFramed(); });
   wrap.appendChild(pic); wrap.appendChild(row);
   game.appendChild(wrap);
   framed = { wrap, pic };
   sizeFramed();
-  setTimeout(() => { if (framed && framed.pic === pic) composeFrame(pic); }, 150);
   if (pic.animate) {
     pic.animate([{ transform: 'rotate(-14deg) scale(0.15)' }, { transform: 'rotate(1.5deg) scale(1.08)', offset: 0.7 }, { transform: 'rotate(-2.5deg) scale(1)' }], { duration: 520, easing: 'ease-out' });
     pic.animate([{ transform: 'rotate(-2.5deg)' }, { transform: 'rotate(-0.6deg)' }], { duration: 1700, delay: 520, direction: 'alternate', iterations: Infinity, easing: 'ease-in-out' });

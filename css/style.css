@@ -624,6 +624,27 @@ canvas { display: block; touch-action: none; }
   #chaos { gap: 5px; }
 }
 
+/* short phones (an iPhone inside Safari, toolbars showing, is about 390x664): two tool
+   rows here too, so the colour dots are not hidden behind a sideways scroll */
+@media (orientation: portrait) and (max-height: 700px) and (min-height: 560px) and (min-width: 350px) {
+  #game {
+    --frogh: 62px;
+    --availh: calc(var(--vh) - 2 * var(--pad) - var(--sat) - var(--sab) - 4 * var(--rowh) - var(--frogh) - 140px - 5 * var(--gap));
+    grid-template-rows: var(--rowh) auto calc(2 * var(--rowh)) var(--frogh) var(--rowh) minmax(140px, 1fr);
+  }
+  #tools {
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: flex-start;
+    gap: 4px 7px;
+    overflow: hidden;
+    touch-action: none;
+  }
+  #tools > :first-child { margin-left: 0; }
+  #tools > .rb:last-child { margin-right: 0; }
+  #tools .brk { display: block; }
+}
+
 /* ---------- COMPACT: phone lying on its side ---------- */
 @media (orientation: landscape) and (max-height: 520px) {
   #game {
