@@ -1,0 +1,693 @@
+/* FROG JAM — shell styles. Cartoon sticker sheet: thick outlines, flat fills, squish. */
+
+:root {
+  --ol: #2b2140;
+  --paper: #fff4d6;
+  --bg: #ffc48c;
+  --red: #ff5a5f;
+  --blue: #3fa7ff;
+  --yel: #ffc93c;
+  --grn: #5ad66f;
+  --pur: #b46bff;
+  --font: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", "Nunito", "Baloo 2", "Comic Sans MS", "Chalkboard SE", system-ui, sans-serif;
+  --rb: 56px;
+  --vh: 100vh;
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  /* chunky rounded text outline + hard drop, built from text-shadows (no spiky miter joins) */
+  --ring:
+    .085em 0 0 var(--ol), .079em .033em 0 var(--ol), .06em .06em 0 var(--ol), .033em .079em 0 var(--ol),
+    0 .085em 0 var(--ol), -.033em .079em 0 var(--ol), -.06em .06em 0 var(--ol), -.079em .033em 0 var(--ol),
+    -.085em 0 0 var(--ol), -.079em -.033em 0 var(--ol), -.06em -.06em 0 var(--ol), -.033em -.079em 0 var(--ol),
+    0 -.085em 0 var(--ol), .033em -.079em 0 var(--ol), .06em -.06em 0 var(--ol), .079em -.033em 0 var(--ol),
+    .085em .08em 0 var(--ol), .079em .113em 0 var(--ol), .06em .14em 0 var(--ol), .033em .159em 0 var(--ol),
+    0 .165em 0 var(--ol), -.033em .159em 0 var(--ol), -.06em .14em 0 var(--ol), -.079em .113em 0 var(--ol),
+    -.085em .08em 0 var(--ol);
+}
+@supports (height: 100dvh) {
+  :root { --vh: 100dvh; }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+html {
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+body {
+  position: fixed;
+  left: 0; top: 0; right: 0; bottom: 0;
+  font-family: var(--font);
+  color: var(--ol);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  /* warm desk with a quiet doodle pattern: dots, rings and little dashes */
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(circle at 24px 30px, rgba(43, 33, 64, .09) 0 4px, transparent 4.6px),
+    radial-gradient(circle at 96px 84px, transparent 0 7px, rgba(43, 33, 64, .08) 7.6px 10.4px, transparent 11px),
+    radial-gradient(circle at 150px 26px, rgba(255, 255, 255, .4) 0 5px, transparent 5.6px),
+    radial-gradient(ellipse 11px 3.5px at 60px 124px, rgba(255, 255, 255, .42) 0 96%, transparent 100%),
+    radial-gradient(ellipse 3.5px 11px at 168px 110px, rgba(43, 33, 64, .08) 0 96%, transparent 100%),
+    radial-gradient(circle at 20px 96px, transparent 0 4px, rgba(255, 255, 255, .38) 4.6px 7px, transparent 7.6px);
+  background-size: 190px 150px, 190px 150px, 230px 170px, 170px 190px, 210px 160px, 150px 130px;
+}
+
+canvas { display: block; touch-action: none; }
+
+/* ================= .rb — the chunky round cartoon button ================= */
+.rb {
+  --bw: 4px;
+  --drop: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--rb);
+  height: var(--rb);
+  margin: 0;
+  padding: 0;
+  border: var(--bw) solid var(--ol);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--ol);
+  box-shadow: 0 var(--drop) 0 var(--ol);
+  cursor: pointer;
+  overflow: hidden;
+  font-size: 0;
+  line-height: 0;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: transform .16s cubic-bezier(.3, 1.9, .5, 1), box-shadow .12s, background-color .12s, opacity .12s;
+}
+.rb > canvas,
+.rb > svg {
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  border-radius: 50%;
+}
+.rb:focus { outline: none; }
+.rb:focus-visible { outline: 3px dashed var(--ol); outline-offset: 3px; }
+@media (hover: hover) {
+  .rb:hover { transform: translateY(-2px) rotate(-5deg); }
+}
+.rb:active {
+  transform: translateY(var(--drop)) scale(1.1, .82);
+  box-shadow: 0 0 0 var(--ol);
+  transition-duration: .05s;
+}
+/* selected / active */
+.rb.on {
+  background: var(--yel);
+  transform: translateY(calc(var(--drop) - 1px)) scale(1.05);
+  box-shadow: 0 1px 0 var(--ol);
+}
+.rb.on::after {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; right: 0; bottom: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 4px var(--yel);
+  pointer-events: none;
+  z-index: 2;
+}
+.rb.on:active { transform: translateY(var(--drop)) scale(1.1, .82); }
+/* cooling down / disabled */
+.rb.cool {
+  filter: grayscale(.9);
+  opacity: .5;
+  transform: translateY(var(--drop)) scale(.92);
+  box-shadow: 0 0 0 var(--ol);
+  cursor: default;
+}
+.rb.sm { --rb: 40px; --bw: 3px; --drop: 3px; }
+.rb.big { --rb: clamp(60px, 10.5vh, 76px); --bw: 5px; --drop: 5px; background: var(--yel); }
+.rb.huge { --rb: clamp(78px, 14.5vh, 108px); --bw: 6px; --drop: 7px; background: var(--grn); }
+
+/* ================= LOBBY ================= */
+#lobby {
+  --gapv: clamp(8px, 2.4vh, 24px);
+  --mw: min(84vw, calc(44vh * 1.28), 440px);
+  --tfs: clamp(38px, min(13.5vw, 9vh), 96px);
+  --cbw: clamp(50px, min(16vw, 9.5vh), 84px);
+  position: fixed;
+  left: 0; top: 0;
+  width: 100%;
+  height: var(--vh);
+  padding: calc(12px + var(--sat)) calc(12px + var(--sar)) calc(12px + var(--sab)) calc(12px + var(--sal));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gapv);
+  overflow: hidden;
+}
+#mascot {
+  flex: 0 0 auto;
+  width: var(--mw);
+  height: calc(var(--mw) * .793);
+  cursor: pointer;
+}
+#lobby-ui {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--gapv) * 1.15);
+}
+
+#title {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 .32em;
+  font: 900 var(--tfs) / 1.12 var(--font);
+  letter-spacing: .05em;
+  padding-bottom: .12em;
+}
+.tw { display: inline-flex; }
+.tl {
+  display: inline-block;
+  color: var(--c, #fff);
+  text-shadow: var(--ring);
+  transform: rotate(var(--r, 0deg));
+  transform-origin: 50% 88%;
+  animation: tl-bob 1.9s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * -.23s);
+}
+@keyframes tl-bob {
+  0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)) scale(1, 1); }
+  42% { transform: translateY(-9%) rotate(calc(var(--r, 0deg) * -1)) scale(.95, 1.07); }
+  68% { transform: translateY(2%) rotate(var(--r, 0deg)) scale(1.07, .92); }
+  84% { transform: translateY(0) rotate(var(--r, 0deg)) scale(.98, 1.02); }
+}
+
+/* ---- room code boxes ---- */
+#codebox {
+  position: relative;
+  display: flex;
+  gap: calc(var(--cbw) * .16);
+  padding-bottom: 7px;
+}
+.cb {
+  width: var(--cbw);
+  height: calc(var(--cbw) * 1.16);
+  display: grid;
+  place-items: center;
+  border: 5px solid var(--ol);
+  border-radius: calc(var(--cbw) * .26);
+  background: #fff;
+  box-shadow: 0 7px 0 var(--ol);
+  font: 900 calc(var(--cbw) * .68) / 1 var(--font);
+  color: var(--ol);
+  transform: rotate(var(--rot, 0deg));
+  transition: background-color .12s;
+}
+.cb b { display: block; font-weight: 900; }
+.cb.tumble { background: #fff3b0; }
+.cb.tumble b { animation: cb-spin .2s linear infinite; }
+.cb.land { animation: cb-land .5s cubic-bezier(.3, 1.8, .5, 1); }
+#codebox.focus .cb.cur { background: #ffe98a; animation: cb-cur .8s ease-in-out infinite; }
+#codebox.shake { animation: shake .55s; }
+#codebox.shake .cb { background: #ffc2c4; }
+#codein {
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  opacity: 0;
+  font: 16px var(--font); /* >=16px so iOS does not zoom on focus */
+  text-transform: uppercase;
+  cursor: pointer;
+  -webkit-user-select: text;
+  user-select: text;
+}
+@keyframes cb-spin {
+  0% { transform: translateY(-34%) rotate(-25deg) scale(.8); opacity: .3; }
+  50% { transform: translateY(0) rotate(0deg) scale(1.1); opacity: 1; }
+  100% { transform: translateY(34%) rotate(25deg) scale(.8); opacity: .3; }
+}
+@keyframes cb-land {
+  0% { transform: rotate(var(--rot, 0deg)) translateY(-18%) scale(.84, 1.2); }
+  35% { transform: rotate(var(--rot, 0deg)) translateY(4%) scale(1.22, .76); }
+  65% { transform: rotate(var(--rot, 0deg)) scale(.94, 1.08); }
+  100% { transform: rotate(var(--rot, 0deg)) scale(1, 1); }
+}
+@keyframes cb-cur {
+  0%, 100% { transform: rotate(var(--rot, 0deg)) translateY(0); }
+  50% { transform: rotate(var(--rot, 0deg)) translateY(-6%) scale(1.03, 1.03); }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  12% { transform: translateX(-16px) rotate(-4deg); }
+  28% { transform: translateX(14px) rotate(4deg); }
+  44% { transform: translateX(-11px) rotate(-3deg); }
+  60% { transform: translateX(8px) rotate(2deg); }
+  78% { transform: translateX(-4px) rotate(-1deg); }
+}
+
+/* ---- dice + play, and the hopping loader that replaces them ---- */
+#actions {
+  position: relative;
+  padding-bottom: 8px;
+}
+#btnrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(16px, 5vw, 30px);
+  padding: 0 clamp(20px, 8vw, 60px);
+}
+#play > svg { animation: play-pulse 1.1s ease-in-out infinite; }
+#dice.spin > svg { animation: dice-spin .55s cubic-bezier(.3, 1.5, .5, 1); }
+#hop {
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  pointer-events: none;
+}
+#lobby.joining #btnrow { visibility: hidden; }
+#lobby.joining #hop { display: block; }
+#lobby.joining #codebox { pointer-events: none; }
+@keyframes play-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.16) rotate(4deg); }
+}
+@keyframes dice-spin {
+  0% { transform: rotate(0deg) scale(1); }
+  40% { transform: rotate(250deg) scale(1.25); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+/* phone lying on its side: mascot left, controls right */
+@media (orientation: landscape) and (max-height: 560px) {
+  #lobby {
+    --gapv: clamp(6px, 3vh, 16px);
+    --mw: min(40vw, calc(78vh * 1.26));
+    --tfs: clamp(30px, min(7.2vw, 15vh), 72px);
+    --cbw: clamp(42px, min(8vw, 16vh), 70px);
+    flex-direction: row;
+    gap: 4vw;
+  }
+  .rb.big { --rb: clamp(52px, 17vh, 70px); }
+  .rb.huge { --rb: clamp(64px, 23vh, 92px); }
+}
+
+/* ================= GAME ================= */
+#game {
+  --pad: 10px;
+  --gap: 8px;
+  --leftw: 208px;
+  --rightw: 76px;
+  --frogh: clamp(84px, 14vh, 110px);
+  --insth: max(170px, 26vh);
+  --rowh: calc(var(--rb) + 8px);
+  --availw: calc(100vw - 2 * var(--pad) - var(--sal) - var(--sar) - var(--leftw) - var(--rightw) - 2 * var(--gap));
+  --availh: calc(var(--vh) - 2 * var(--pad) - var(--sat) - var(--sab) - var(--frogh) - var(--insth) - 2 * var(--gap));
+  --sw: max(160px, min(var(--availw), calc(var(--availh) * 4 / 3)));
+  position: fixed;
+  left: 0; top: 0;
+  width: 100%;
+  height: var(--vh);
+  padding: calc(var(--pad) + var(--sat)) calc(var(--pad) + var(--sar)) calc(var(--pad) + var(--sab)) calc(var(--pad) + var(--sal));
+  display: grid;
+  gap: var(--gap);
+  /* WIDE: code + tools | stage | chaos, frogs strip, picker + instrument */
+  grid-template-columns: minmax(var(--leftw), 1fr) var(--sw) minmax(var(--rightw), 1fr);
+  grid-template-rows: auto minmax(0, 1fr) var(--frogh) var(--insth);
+  grid-template-areas:
+    "code  stage chaos"
+    "tools stage chaos"
+    "frogs frogs frogs"
+    "inst  inst  inst";
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* ---- room code cluster ---- */
+#codecluster {
+  grid-area: code;
+  justify-self: start;
+  align-self: start;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-bottom: 5px;
+  min-width: 0;
+}
+.codepill {
+  position: relative;
+  height: 40px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border: 4px solid var(--ol);
+  border-radius: 999px;
+  box-shadow: 0 3px 0 var(--ol);
+  transform: rotate(-2deg);
+}
+#roomcode {
+  font: 900 22px / 1 var(--font);
+  letter-spacing: .14em;
+  margin-right: -.14em;
+  white-space: nowrap;
+}
+#netbad {
+  position: absolute;
+  top: -13px;
+  right: -13px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--ol);
+  animation: wob .55s ease-in-out infinite;
+}
+#netbad > svg { display: block; width: 100%; height: 100%; }
+@keyframes wob {
+  0%, 100% { transform: rotate(-14deg) scale(1); }
+  50% { transform: rotate(14deg) scale(1.14); }
+}
+#share .ic-ok { display: none; }
+#share.ok { background: var(--grn); }
+#share.ok .ic-link { display: none; }
+#share.ok .ic-ok { display: block; animation: pop .5s cubic-bezier(.3, 1.9, .5, 1); }
+@keyframes pop {
+  0% { transform: scale(.2) rotate(-40deg); }
+  60% { transform: scale(1.35) rotate(8deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+/* ---- the paper, taped to the desk ---- */
+#stage {
+  grid-area: stage;
+  place-self: center;
+  position: relative;
+  width: var(--sw);
+  height: calc(var(--sw) * .75);
+  border: 5px solid var(--ol);
+  border-radius: 18px;
+  background: var(--paper);
+  box-shadow: 0 6px 0 rgba(43, 33, 64, .28);
+}
+#stage > canvas {
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 13px;
+}
+#stage::before,
+#stage::after {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  top: -3px;
+  width: 54px;
+  height: 19px;
+  background: #ffe58a;
+  border: 3px solid var(--ol);
+  border-radius: 4px;
+  pointer-events: none;
+}
+#stage::before { left: -21px; transform: rotate(-40deg); }
+#stage::after { right: -21px; transform: rotate(40deg); }
+
+/* ---- button trays ---- */
+#tools, #chaos, #instpick {
+  min-width: 0;
+  min-height: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+#tools::-webkit-scrollbar, #chaos::-webkit-scrollbar, #instpick::-webkit-scrollbar { display: none; }
+
+#tools {
+  grid-area: tools;
+  justify-self: end;
+  width: var(--leftw);
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  justify-content: center;
+  gap: 8px;
+  padding: 3px 3px 7px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+/* DRAW puts a row break between the six big tool buttons and the six colour dots */
+#tools .brk { flex: 0 0 100%; height: 0; }
+#tools .rb.dot { margin: 0 6px; } /* three dots per row, lined up under the big buttons */
+#chaos {
+  grid-area: chaos;
+  justify-self: start;
+  width: var(--rightw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 3px 3px 7px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+/* centre the column without making its top unreachable when it overflows */
+#chaos > :first-child { margin-top: auto; }
+#chaos > :last-child { margin-bottom: auto; }
+
+#instpick {
+  grid-row: 4;
+  grid-column: 1;
+  justify-self: start;
+  align-self: center;
+  width: var(--leftw);
+  display: grid;
+  grid-template-columns: repeat(2, var(--rb));
+  gap: 12px 14px;
+  place-content: center;
+  padding-bottom: 5px;
+  z-index: 1;
+}
+
+/* ---- canvases owned by other modules: NO border/padding here (fitCanvas uses the border box) ---- */
+#frogs {
+  grid-area: frogs;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+#inst {
+  grid-area: inst;
+  min-width: 0;
+  min-height: 0;
+  margin: 5px 5px 5px calc(var(--leftw) + var(--gap) + 5px);
+  width: calc(100% - var(--leftw) - var(--gap) - 10px);
+  height: calc(100% - 10px);
+  border-radius: 20px;
+  background: var(--paper);
+  box-shadow: 0 0 0 5px var(--ol);
+}
+
+/* ---------- NARROW: phones in portrait, small windows ---------- */
+@media (orientation: portrait), (max-width: 819.98px) and (min-height: 520.02px) {
+  #game {
+    --rb: 48px;
+    --pad: 6px;
+    --gap: 5px;
+    --frogh: 84px;
+    --availw: calc(100vw - 2 * var(--pad) - var(--sal) - var(--sar));
+    --availh: calc(var(--vh) - 2 * var(--pad) - var(--sat) - var(--sab) - 3 * var(--rowh) - var(--frogh) - max(150px, 24vh) - 5 * var(--gap));
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: var(--rowh) auto var(--rowh) var(--frogh) var(--rowh) minmax(150px, 1fr);
+    grid-template-areas:
+      "code  chaos"
+      "stage stage"
+      "tools tools"
+      "frogs frogs"
+      "pick  pick"
+      "inst  inst";
+  }
+  #codecluster { align-self: center; padding-bottom: 3px; }
+  #stage { border-radius: 14px; box-shadow: 0 4px 0 rgba(43, 33, 64, .28); }
+  #stage > canvas { border-radius: 9px; }
+  #stage::before, #stage::after { width: 42px; height: 15px; }
+  #stage::before { left: -17px; }
+  #stage::after { right: -17px; }
+  #tools {
+    justify-self: stretch;
+    width: auto;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 7px;
+    padding: 2px 3px 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    touch-action: pan-x;
+  }
+  #tools .brk { display: none; }
+  #tools .rb.dot { margin: 0; }
+  #tools > :first-child { margin-left: auto; }
+  #tools > .rb:last-child { margin-right: auto; }
+  #chaos {
+    justify-self: end;
+    width: auto;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 7px;
+    padding: 2px 3px 6px;
+    overflow: visible;
+  }
+  #chaos > :first-child { margin-top: 0; }
+  #chaos > :last-child { margin-bottom: 0; }
+  #instpick {
+    grid-area: pick;
+    justify-self: stretch;
+    align-self: stretch;
+    width: auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 14px;
+    padding: 2px 3px 6px;
+  }
+  #inst {
+    margin: 5px;
+    width: calc(100% - 10px);
+    border-radius: 18px;
+  }
+}
+/* tall phones: two tool rows (tools, then colours) so nothing hides behind a scroll */
+@media (orientation: portrait) and (min-height: 700.02px) and (min-width: 350px) and (max-width: 640px) {
+  #game {
+    --availh: calc(var(--vh) - 2 * var(--pad) - var(--sat) - var(--sab) - 4 * var(--rowh) - var(--frogh) - max(150px, 24vh) - 5 * var(--gap));
+    grid-template-rows: var(--rowh) auto calc(2 * var(--rowh)) var(--frogh) var(--rowh) minmax(150px, 1fr);
+  }
+  #tools {
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: flex-start;
+    gap: 4px 7px; /* the row break is a (zero-height) row of its own, so the row gap counts twice */
+    overflow: hidden;
+    touch-action: none;
+  }
+  #tools > :first-child { margin-left: 0; }
+  #tools > .rb:last-child { margin-right: 0; }
+  #tools .brk { display: block; }
+}
+/* short phones: squeeze the chrome so the paper stays big */
+@media (orientation: portrait) and (max-height: 700px) {
+  #game { --rb: 44px; --frogh: 72px; }
+  .rb.sm { --rb: 36px; }
+  .codepill { height: 36px; }
+  #roomcode { font-size: 19px; }
+}
+
+/* narrow phones: the code cluster and the chaos buttons have to share the top row */
+@media (orientation: portrait) and (max-width: 385px) {
+  #codecluster { gap: 4px; }
+  .rb.sm { --rb: 34px; }
+  .codepill { height: 34px; padding: 0 8px; border-width: 3px; }
+  #roomcode { font-size: 18px; letter-spacing: .08em; margin-right: -.08em; }
+  #chaos { gap: 5px; }
+}
+
+/* ---------- COMPACT: phone lying on its side ---------- */
+@media (orientation: landscape) and (max-height: 520px) {
+  #game {
+    --rb: 44px;
+    --pad: 6px;
+    --gap: 6px;
+    --frogh: 66px;
+    --leftw: 152px; /* three buttons per row, so all twelve tools fit without scrolling */
+    --rightw: clamp(210px, 32vw, 330px);
+    --availw: calc(100vw - 2 * var(--pad) - var(--sal) - var(--sar) - var(--leftw) - var(--rightw) - 2 * var(--gap));
+    --availh: calc(var(--vh) - 2 * var(--pad) - var(--sat) - var(--sab) - var(--frogh) - var(--gap));
+    grid-template-columns: var(--leftw) minmax(0, 1fr) var(--rightw);
+    grid-template-rows: auto auto minmax(0, 1fr) var(--frogh);
+    grid-template-areas:
+      "code  stage chaos"
+      "tools stage pick"
+      "tools stage inst"
+      "frogs frogs inst";
+  }
+  #codecluster {
+    justify-self: center;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px 8px;
+  }
+  .codepill { order: -1; height: 34px; margin: 0 24px; } /* the margins keep the pill on a row of its own */
+  #roomcode { font-size: 19px; }
+  .rb.sm { --rb: 36px; }
+  #stage { border-radius: 14px; box-shadow: 0 4px 0 rgba(43, 33, 64, .28); }
+  #stage > canvas { border-radius: 9px; }
+  #stage::before, #stage::after { width: 42px; height: 15px; }
+  #stage::before { left: -17px; }
+  #stage::after { right: -17px; }
+  #tools { justify-self: stretch; width: auto; gap: 5px 7px; padding: 2px 3px 5px; }
+  #tools .rb.dot { margin: 0; }
+  #chaos {
+    justify-self: center;
+    width: auto;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 2px 3px 6px;
+    overflow: visible;
+  }
+  #chaos > :first-child { margin-top: 0; }
+  #chaos > :last-child { margin-bottom: 0; }
+  #instpick {
+    grid-area: pick;
+    justify-self: stretch;
+    align-self: stretch;
+    width: auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 9px;
+    padding: 2px 3px 6px;
+  }
+  #inst {
+    margin: 5px;
+    width: calc(100% - 10px);
+    border-radius: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tl, #play > svg, .cb.cur { animation: none !important; }
+}

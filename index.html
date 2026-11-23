@@ -1,2 +1,103 @@
-<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ribbit Riot</title>
-<body style="margin:0;height:100vh;display:grid;place-items:center;background:#ffd98a;font:900 64px system-ui">🐸</body>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Frog Jam</title>
+<meta name="theme-color" content="#ffc48c">
+<meta name="color-scheme" content="light">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cg stroke='%232b2140' stroke-width='4' fill='%235ad66f'%3E%3Ccircle cx='19' cy='19' r='12'/%3E%3Ccircle cx='45' cy='19' r='12'/%3E%3Cellipse cx='32' cy='40' rx='28' ry='20'/%3E%3C/g%3E%3Cg stroke='%232b2140' stroke-width='3' fill='%23fff'%3E%3Ccircle cx='19' cy='18' r='8'/%3E%3Ccircle cx='45' cy='18' r='8'/%3E%3C/g%3E%3Ccircle cx='21' cy='19' r='4' fill='%232b2140'/%3E%3Ccircle cx='43' cy='19' r='4' fill='%232b2140'/%3E%3Cpath d='M17 43q15 11 30 0' fill='none' stroke='%232b2140' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ============ LOBBY ============ -->
+<main id="lobby">
+  <canvas id="mascot"></canvas>
+  <div id="lobby-ui">
+    <h1 id="title" aria-label="FROG JAM">
+      <span class="tw" aria-hidden="true"><span class="tl" style="--i:0;--r:-6deg;--c:var(--red)">F</span><span class="tl" style="--i:1;--r:4deg;--c:var(--blue)">R</span><span class="tl" style="--i:2;--r:-3deg;--c:var(--yel)">O</span><span class="tl" style="--i:3;--r:6deg;--c:var(--grn)">G</span></span>
+      <span class="tw" aria-hidden="true"><span class="tl" style="--i:4;--r:-5deg;--c:var(--pur)">J</span><span class="tl" style="--i:5;--r:3deg;--c:var(--red)">A</span><span class="tl" style="--i:6;--r:-4deg;--c:var(--blue)">M</span></span>
+    </h1>
+
+    <div id="codebox">
+      <span class="cb" style="--rot:-3deg"><b></b></span>
+      <span class="cb" style="--rot:2deg"><b></b></span>
+      <span class="cb" style="--rot:-1.5deg"><b></b></span>
+      <span class="cb" style="--rot:3deg"><b></b></span>
+      <input id="codein" type="text" inputmode="text" enterkeyhint="go" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" aria-label="room code">
+    </div>
+
+    <div id="actions">
+      <div id="btnrow">
+        <button id="dice" class="rb big" type="button" aria-label="random room code">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <rect x="10" y="10" width="28" height="28" rx="8" fill="#fff" stroke="#2b2140" stroke-width="4"/>
+            <g fill="#2b2140"><circle cx="18" cy="18" r="2.8"/><circle cx="30" cy="18" r="2.8"/><circle cx="24" cy="24" r="2.8"/><circle cx="18" cy="30" r="2.8"/><circle cx="30" cy="30" r="2.8"/></g>
+          </svg>
+        </button>
+        <button id="play" class="rb huge" type="button" aria-label="play">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <path d="M19 13.5 36.5 24 19 34.5z" fill="#fff" stroke="#2b2140" stroke-width="4" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+      <canvas id="hop"></canvas>
+    </div>
+  </div>
+</main>
+
+<!-- ============ GAME ============ -->
+<div id="game" hidden>
+  <div id="codecluster">
+    <button id="leave" class="rb sm" type="button" aria-label="leave room">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M11 40V9h17v31z" fill="#ff5a5f" stroke="#2b2140" stroke-width="4" stroke-linejoin="round"/>
+        <circle cx="23" cy="25" r="2.6" fill="#2b2140"/>
+        <path d="M32 25h10M38 19.5l5.5 5.5-5.5 5.5" fill="none" stroke="#2b2140" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <div class="codepill">
+      <span id="roomcode"></span>
+      <span id="netbad" hidden>
+        <svg viewBox="0 0 48 48" fill="none" stroke-linecap="round" aria-hidden="true">
+          <g stroke="#2b2140" stroke-width="5"><path d="M9 21a22 22 0 0 1 30 0"/><path d="M16 29a12 12 0 0 1 16 0"/></g>
+          <circle cx="24" cy="36" r="3.2" fill="#2b2140"/>
+          <path d="M10 41 38 8" stroke="#2b2140" stroke-width="10"/>
+          <path d="M10 41 38 8" stroke="#ff5a5f" stroke-width="5"/>
+        </svg>
+      </span>
+    </div>
+    <button id="share" class="rb sm" type="button" aria-label="share room link">
+      <svg class="ic-link" viewBox="0 0 48 48" aria-hidden="true">
+        <g transform="rotate(-45 24 24)" fill="none" stroke="#2b2140" stroke-width="5" stroke-linecap="round">
+          <rect x="6" y="17.5" width="21" height="13" rx="6.5"/>
+          <rect x="21" y="17.5" width="21" height="13" rx="6.5"/>
+        </g>
+      </svg>
+      <svg class="ic-ok" viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M13 25l8 8 15-17" fill="none" stroke="#2b2140" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M13 25l8 8 15-17" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </div>
+
+  <div id="chaos"></div>
+  <div id="tools"></div>
+
+  <div id="stage">
+    <canvas id="art" width="1200" height="900"></canvas>
+    <canvas id="fx" width="1200" height="900"></canvas>
+  </div>
+
+  <canvas id="frogs"></canvas>
+  <div id="instpick"></div>
+  <canvas id="inst"></canvas>
+</div>
+
+<script src="vendor/mqtt.min.js"></script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
